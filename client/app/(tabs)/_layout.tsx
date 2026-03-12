@@ -1,7 +1,7 @@
 import { View, Text } from 'react-native'
 import React from 'react'
 import { Tabs } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import { COLORS } from '@/constants'
 
 export default function TabLayout() {
@@ -26,7 +26,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} color={color} size={26} />
         }} />
         <Tabs.Screen name="cart" options={{ 
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'cart' : 'cart-outline'} color={color} size={26} />
+            tabBarIcon: ({ color, focused }) => <Feather name={focused ? 'shopping-cart' : 'shopping-cart'} color={color} size={26} />
         }} />
         <Tabs.Screen name="favorites" options={{ 
             tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'heart' : 'heart-outline'} color={color} size={26} />
