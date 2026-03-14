@@ -4,8 +4,5 @@ import { COLORS } from "@/constants";
 export default function RootLayout() {
   return <Stack screenOptions={{
     headerShown: false,
-    contentStyle: {
-      backgroundColor: COLORS.background,
-    },
   }}/>;
 }
