@@ -3,12 +3,13 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { Text, TouchableOpacity, View, Image } from "react-native";
 import { COLORS } from "@/constants";
+import { useCart } from "@/context/CartContext";
 import type { HeaderProps } from "@/constants/types";
 
 export default function Header({ title, showBack, showSearch, showCart, showMenu, showLogo }: HeaderProps) {
 
     const router = useRouter();
-    const { itemCount } = {itemCount:6}
+    const { itemCount } = useCart();
 
     return (
         <View className="flex-row items-center justify-between px-4 py-3 bg-white">

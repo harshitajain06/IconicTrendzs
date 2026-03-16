@@ -2,7 +2,11 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Dimensions, Image, ScrollView, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import CategoryItem from "@/components/CategoryItem";
 import Header from "@/components/Header";
+import ProductCard from "@/components/ProductCard";
+import api from "@/constants/api";
+import type { Product } from "@/constants/types";
 import { CATEGORIES } from "@/constants";
 import { BANNERS } from "@/assets/assets";
 
@@ -11,16 +15,29 @@ const { width } = Dimensions.get("window");
 export default function Home() {
     const router = useRouter();
     const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+    const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
 
     const categories = [{ id: "all", name: "All", icon: "grid" }, ...CATEGORIES];
 
- 
+    useEffect(() => {
+        fetchProducts();
+    }, []);
 
+    const fetchProducts = async () => {
+        try {
+            const { data } = await api.get("/products");
+            setProducts(data.data);
+        } catch (error) {
+            console.error("Error fetching products:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <Header title="Iconic Trendzs" showMenu showCart showLogo />
+            <Header title="Newever" showMenu showCart showLogo />
 
             <ScrollView className="flex-1 px-4" showsVerticalScrollIndicator={false}>
                 {/* Banner Slider */}
@@ -75,7 +92,14 @@ export default function Home() {
                         <Text className="text-xl font-bold text-primary">Categories</Text>
                     </View>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-
+                        {categories.map((cat: any) => (
+                            <CategoryItem
+                                key={cat.id}
+                                item={cat}
+                                isSelected={false}
+                                onPress={() => router.push({ pathname: "/shop", params: { category: cat.id === 'all' ? '' : cat.name } })}
+                            />
+                        ))}
                     </ScrollView>
                 </View>
 
@@ -83,8 +107,19 @@ export default function Home() {
                 <View className="mb-8">
                     <View className="flex-row justify-between items-center mb-4">
                         <Text className="text-xl font-bold text-primary">Popular</Text>
-                   
+                        <TouchableOpacity onPress={() => router.push("/shop")}>
+                            <Text className="text-secondary text-sm">See All</Text>
+                        </TouchableOpacity>
                     </View>
+                    {loading ? (
+                        <ActivityIndicator size="large" />
+                    ) : (
+                        <View className="flex-row flex-wrap justify-between">
+                            {products.slice(0, 4).map((product) => (
+                                <ProductCard key={product._id} product={product} />
+                            ))}
+                        </View>
+                    )}
                 </View>
 
                 {/* Newsletter CTA */}
