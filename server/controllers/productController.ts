@@ -6,12 +6,39 @@ import { Request, Response } from "express";
 // GET /api/products
 export const getProducts = async (req: Request, res: Response) => {
     try {
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 10, category, minPrice, maxPrice, search, sort = "-createdAt" } = req.query;
 
         const query: any = { isActive: true };
+        const priceQuery: Record<string, number> = {};
+
+        if (category && typeof category === "string") {
+            query.category = category;
+        }
+
+        if (minPrice && !Number.isNaN(Number(minPrice))) {
+            priceQuery.$gte = Number(minPrice);
+        }
+
+        if (maxPrice && !Number.isNaN(Number(maxPrice))) {
+            priceQuery.$lte = Number(maxPrice);
+        }
+
+        if (Object.keys(priceQuery).length > 0) {
+            query.price = priceQuery;
+        }
+
+        if (search && typeof search === "string") {
+            query.$or = [
+                { name: { $regex: search, $options: "i" } },
+                { description: { $regex: search, $options: "i" } },
+            ];
+        }
+
+        const parsedSort = typeof sort === "string" && sort.trim().length > 0 ? sort : "-createdAt";
 
         const total = await Product.countDocuments(query);
         const products = await Product.find(query)
+            .sort(parsedSort)
             .skip((Number(page) - 1) * Number(limit))
             .limit(Number(limit));
 
