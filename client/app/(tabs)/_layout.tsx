@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants";
 import Feather from '@expo/vector-icons/Feather';
 import { useCart } from "@/context/CartContext";
@@ -8,6 +9,7 @@ import { useCart } from "@/context/CartContext";
 export default function TabLayout() {
 
     const { cartItems } = useCart();
+    const insets = useSafeAreaInsets();
 
     return (
         <Tabs
@@ -20,8 +22,9 @@ export default function TabLayout() {
                     backgroundColor: "#fff",
                     borderTopWidth: 1,
                     borderTopColor: "#F0F0F0",
-                    height: 56,
-                    paddingTop: 8
+                    height: 56 + insets.bottom,
+                    paddingTop: 8,
+                    paddingBottom: insets.bottom,
                 },
             }}
         >

@@ -122,12 +122,24 @@ export default function Home() {
                     )}
                 </View>
 
-                {/* Newsletter CTA */}
-                <View className="bg-gray-100 p-6 rounded-2xl mb-20 items-center">
-                    <Text className="text-2xl font-bold text-primary mb-2 text-center">Join the Revolution</Text>
-                    <Text className="text-secondary text-center mb-4">Subscribe to our newsletter and get 10% off your first purchase.</Text>
-                    <TouchableOpacity className="bg-primary w-4/5 py-3 rounded-full items-center">
-                        <Text className="text-white font-medium text-base">Subscribe Now</Text>
+                {/* Promo — pricing & tiered offers */}
+                <View className="bg-gray-100 p-6 rounded-2xl mb-20">
+                    <Text className="text-2xl font-bold text-primary mb-2 text-center">All styles under ₹499</Text>
+                    <Text className="text-secondary text-center text-sm mb-5 px-1">
+                        Stack extra savings when you spend more.
+                    </Text>
+                    <View className="flex-row gap-3 mb-4">
+                        <View className="flex-1 border border-primary/25 rounded-xl p-3 bg-white">
+                            <Text className="text-secondary text-xs text-center mb-1">On spend of ₹1499</Text>
+                            <Text className="text-primary font-bold text-center text-base">Extra 15% OFF</Text>
+                        </View>
+                        <View className="flex-1 border border-primary/25 rounded-xl p-3 bg-white">
+                            <Text className="text-secondary text-xs text-center mb-1">On spend of ₹1999</Text>
+                            <Text className="text-primary font-bold text-center text-base">Extra 20% OFF</Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity className="bg-primary w-4/5 py-3 rounded-full items-center self-center" onPress={() => router.push("/shop")}>
+                        <Text className="text-white font-medium text-base">Shop Now</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>

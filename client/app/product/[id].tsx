@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "@clerk/clerk-expo";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dimensions, Image, ScrollView, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import Toast from 'react-native-toast-message';
 import { SafeAreaView } from "react-native-safe-area-context";
+import { FlyToCartOverlay, type FlyToCartHandle } from "@/components/FlyToCartOverlay";
 import { COLORS } from "@/constants";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
@@ -18,8 +20,13 @@ export default function ProductDetails() {
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
 
+    const { isSignedIn } = useAuth();
     const { addToCart, cartItems } = useCart();
     const { toggleWishlist, isInWishlist } = useWishlist();
+
+    const flyRef = useRef<FlyToCartHandle>(null);
+    const addButtonRef = useRef<View>(null);
+    const cartIconRef = useRef<View>(null);
 
     const [selectedSize, setSelectedSize] = useState<string | null>(null);
     const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -71,11 +78,15 @@ export default function ProductDetails() {
             return;
         }
 
+        if (isSignedIn) {
+            flyRef.current?.animate(addButtonRef, cartIconRef, product.images?.[0]);
+        }
         addToCart(product, selectedSize || "");
     };
 
     return (
         <View className="flex-1 bg-white">
+            <FlyToCartOverlay ref={flyRef} />
             <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
                 {/* Image Carousel */}
                 <View className="relative h-[450px] bg-gray-100 mb-6">
@@ -176,22 +187,26 @@ export default function ProductDetails() {
 
             {/* Footer */}
             <View className="absolute bottom-0 left-0 flex-row right-0 p-4 bg-white border-t border-gray-100">
-                <TouchableOpacity
-                    onPress={handleAddToCart}
-                    className="w-4/5 bg-primary py-4 rounded-full items-center shadow-lg flex-row justify-center"
-                >
-                    <Ionicons name="bag-outline" size={20} color="white" />
-                    <Text className="text-white font-bold text-base ml-2">Add to Cart</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={() => router.push("/(tabs)/cart")}
-                    className="w-1/5 py-3 flex-row justify-center relative"
-                >
-                    <Ionicons name="cart-outline" size={24} />
-                    <View className="absolute top-2 right-4 size-4 z-10 bg-black rounded-full justify-center items-center">
-                        <Text className="text-white text-[9px]">{cartItems.reduce((acc, item) => acc + item.quantity, 0)}</Text>
-                    </View>
-                </TouchableOpacity>
+                <View ref={addButtonRef} collapsable={false} className="w-4/5">
+                    <TouchableOpacity
+                        onPress={handleAddToCart}
+                        className="bg-primary py-4 rounded-full items-center shadow-lg flex-row justify-center"
+                    >
+                        <Ionicons name="bag-outline" size={20} color="white" />
+                        <Text className="text-white font-bold text-base ml-2">Add to Cart</Text>
+                    </TouchableOpacity>
+                </View>
+                <View ref={cartIconRef} collapsable={false} className="w-1/5 py-3 flex-row justify-center relative">
+                    <TouchableOpacity
+                        onPress={() => router.push("/(tabs)/cart")}
+                        className="flex-1 items-center justify-center"
+                    >
+                        <Ionicons name="cart-outline" size={24} />
+                        <View className="absolute top-2 right-4 size-4 z-10 bg-black rounded-full justify-center items-center">
+                            <Text className="text-white text-[9px]">{cartItems.reduce((acc, item) => acc + item.quantity, 0)}</Text>
+                        </View>
+                    </TouchableOpacity>
+                </View>
             </View>
         </View>
     );

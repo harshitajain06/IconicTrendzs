@@ -80,6 +80,14 @@ export default function Addresses() {
         setSubmitting(true);
         try {
             const token = await getToken();
+            if (!token) {
+                Toast.show({
+                    type: "error",
+                    text1: "Failed to Save Address",
+                    text2: "Sign in to save addresses.",
+                });
+                return;
+            }
             const data = { type, street, city, state, zipCode, country, isDefault };
 
             if (isEditing && editingId) {
@@ -96,10 +104,18 @@ export default function Addresses() {
             resetForm();
             fetchAddresses();
         } catch (error: any) {
+            const status = error.response?.status;
+            const msg =
+                error.response?.data?.message ||
+                (status === 404
+                    ? "Address API not found — restart the backend on port 3000."
+                    : error.code === "ERR_NETWORK"
+                      ? "Cannot reach API — check EXPO_PUBLIC_API_URL and that the server is running."
+                      : error.message);
             Toast.show({
-                type: 'error',
-                text1: 'Failed to Save Address',
-                text2: error.response?.data?.message || "Something went wrong"
+                type: "error",
+                text1: "Failed to Save Address",
+                text2: msg || "Something went wrong",
             });
         } finally {
             setSubmitting(false);
