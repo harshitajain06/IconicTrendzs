@@ -11,7 +11,7 @@ import WishlistRouter from "./routes/wishlistRoutes.js";
 import AdminRouter from "./routes/adminRoutes.js";
 import makeAdmin from "./scripts/makeAdmin.js";
 import { clerkWebhook } from "./controllers/webhooks.js";
-import { handleStripeWebhook } from "./controllers/paymentController.js";
+import { handleRazorpayWebhook } from "./controllers/paymentController.js";
 import paymentRouter from "./routes/paymentRoute.js";
 import { seedProducts } from "./scripts/seedProducts.js";
 
@@ -21,6 +21,7 @@ const app = express();
 await connectDB();
 
 app.post("/api/clerk", express.raw({ type: "application/json" }), clerkWebhook);
+app.post("/api/payments/webhook", express.raw({ type: "application/json" }), handleRazorpayWebhook);
 
 // Middleware
 app.use(cors());
@@ -40,7 +41,7 @@ app.use("/api/orders", OrderRouter);
 app.use("/api/addresses", AddressRouter);
 app.use("/api/wishlist", WishlistRouter);
 app.use("/api/admin", AdminRouter);
-
+app.use("/api/payments", paymentRouter);
 
 const PORT = process.env.PORT || 3000;
 

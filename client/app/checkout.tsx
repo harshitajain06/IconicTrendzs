@@ -12,19 +12,95 @@ import { useAuth } from "@clerk/clerk-expo";
 import Toast from 'react-native-toast-message';
 import { WebView } from 'react-native-webview';
 
+type RazorpayOrderResponse = {
+    success?: boolean;
+    keyId: string;
+    orderId: string;
+    amount: number;
+    currency: string;
+};
+
+function buildRazorpayCheckoutHtml(init: {
+    keyId: string;
+    amount: number;
+    currency: string;
+    orderId: string;
+    mongoOrderId: string;
+}) {
+    const safe = JSON.stringify(init).replace(/</g, "\\u003c");
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body>
+<script>const INIT=${safe};</script>
+<script src="https://checkout.razorpay.com/v1/checkout.js" onload="openRzp()"></script>
+<script>
+function openRzp(){
+  var options={
+    key:INIT.keyId,
+    amount:INIT.amount,
+    currency:INIT.currency,
+    order_id:INIT.orderId,
+    name:'Iconic Trendzs',
+    description:'Order payment',
+    handler:function(response){
+      if(window.ReactNativeWebView){
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type:'razorpay_success',
+          mongoOrderId:INIT.mongoOrderId,
+          razorpay_payment_id:response.razorpay_payment_id,
+          razorpay_order_id:response.razorpay_order_id,
+          razorpay_signature:response.razorpay_signature
+        }));
+      }
+    },
+    modal:{ondismiss:function(){
+      if(window.ReactNativeWebView){
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'razorpay_dismiss'}));
+      }
+    }}
+  };
+  var rzp=new Razorpay(options);
+  rzp.open();
+}
+</script></body></html>`;
+}
+
+function loadRazorpayScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (typeof window === "undefined" || typeof document === "undefined") {
+            reject(new Error("Not in browser"));
+            return;
+        }
+        const w = window as unknown as { Razorpay?: unknown };
+        if (w.Razorpay) {
+            resolve();
+            return;
+        }
+        const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+        if (existing) {
+            existing.addEventListener("load", () => resolve());
+            existing.addEventListener("error", () => reject(new Error("Razorpay script failed")));
+            return;
+        }
+        const s = document.createElement("script");
+        s.src = "https://checkout.razorpay.com/v1/checkout.js";
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("Failed to load Razorpay"));
+        document.body.appendChild(s);
+    });
+}
+
 export default function Checkout() {
     const router = useRouter();
-    const { cartTotal, cartItems, clearCart } = useCart();
+    const { cartTotal, clearCart } = useCart();
     const [loading, setLoading] = useState(false);
     const [pageLoading, setPageLoading] = useState(true);
 
     const { getToken } = useAuth();
     const [showGateway, setShowGateway] = useState(false);
-    const [checkoutUrl, setCheckoutUrl] = useState("");
+    const [gatewayHtml, setGatewayHtml] = useState("");
 
     const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
 
-    const [paymentMethod, setPaymentMethod] = useState<"cash" | "stripe">("cash");
+    const [paymentMethod, setPaymentMethod] = useState<"cash" | "razorpay">("cash");
 
     const shipping = 2.00;
     const tax = 0;
@@ -40,7 +116,6 @@ export default function Checkout() {
             });
             const addrList = data.data;
             if (addrList.length > 0) {
-                // Find default or first
                 const def = addrList.find((a: Address) => a.isDefault) || addrList[0];
                 setSelectedAddress(def);
             }
@@ -56,12 +131,32 @@ export default function Checkout() {
         }
     };
 
-    const handleStripeCheckout = async () => {
+    const verifyWithServer = async (payload: {
+        mongoOrderId: string;
+        razorpay_payment_id: string;
+        razorpay_order_id: string;
+        razorpay_signature: string;
+    }) => {
+        const token = await getToken();
+        await api.post(
+            "/payments/verify",
+            {
+                mongoOrderId: payload.mongoOrderId,
+                razorpay_payment_id: payload.razorpay_payment_id,
+                razorpay_order_id: payload.razorpay_order_id,
+                razorpay_signature: payload.razorpay_signature,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+        await clearCart();
+        router.replace("/orders");
+    };
+
+    const handleRazorpayCheckout = async () => {
         setLoading(true);
         try {
             const token = await getToken();
 
-            // Creating the order
             const shippingAddressPayload = {
                 street: selectedAddress!.street,
                 city: selectedAddress!.city,
@@ -73,7 +168,7 @@ export default function Checkout() {
             const orderPayload = {
                 shippingAddress: shippingAddressPayload,
                 notes: "Placed via App",
-                paymentMethod: "stripe",
+                paymentMethod: "razorpay",
             };
 
             const { data: orderData } = await api.post("/orders", orderPayload, {
@@ -84,63 +179,122 @@ export default function Checkout() {
                 throw new Error("Failed to create order");
             }
 
-            const orderId = orderData.data._id;
-            console.log("Created Pending Order:", orderId);
+            const mongoOrderId = orderData.data._id as string;
 
-            // Initiate Stripe Checkout with Order ID
-            let payload: any = {
-                items: cartItems,
-                shipping: shipping,
-                orderId: orderId,
+            const { data: rzpData } = await api.post(
+                "/payments/razorpay-order",
+                { orderId: mongoOrderId },
+                { headers: { Authorization: `Bearer ${token}` } }
+            ) as { data: RazorpayOrderResponse };
+
+            if (!rzpData?.keyId || !rzpData?.orderId) {
+                throw new Error("Invalid Razorpay order response");
             }
 
-            if (Platform.OS === 'web') {
-                const origin = window.location.origin.replace(/\/$/, '');
-                payload.success_url = `${origin}/orders`;
-                payload.cancel_url = `${origin}/checkout`;
-            }
-
-            const { data: sessionData } = await api.post("/payments/checkout-session", payload, { headers: { Authorization: `Bearer ${token}` } });
-
-            if (sessionData.url) {
-                if (Platform.OS === 'web') {
-                    window.location.href = sessionData.url;
-                } else {
-                    setCheckoutUrl(sessionData.url);
-                    setShowGateway(true);
-                }
+            if (Platform.OS === "web") {
+                await loadRazorpayScript();
+                const w = window as unknown as {
+                    Razorpay: new (opts: Record<string, unknown>) => { open: () => void };
+                };
+                const options = {
+                    key: rzpData.keyId,
+                    amount: rzpData.amount,
+                    currency: rzpData.currency,
+                    order_id: rzpData.orderId,
+                    name: "Iconic Trendzs",
+                    description: "Order payment",
+                    handler: async (response: {
+                        razorpay_payment_id: string;
+                        razorpay_order_id: string;
+                        razorpay_signature: string;
+                    }) => {
+                        try {
+                            await verifyWithServer({
+                                mongoOrderId,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_signature: response.razorpay_signature,
+                            });
+                            Toast.show({
+                                type: 'success',
+                                text1: 'Paid',
+                                text2: 'Payment successful'
+                            });
+                        } catch (e: unknown) {
+                            console.error(e);
+                            Toast.show({
+                                type: 'error',
+                                text1: 'Verification failed',
+                                text2: 'Payment may have succeeded; check your orders'
+                            });
+                        }
+                    },
+                };
+                const rzp = new w.Razorpay(options);
+                rzp.open();
             } else {
-                Toast.show({
-                    type: 'error',
-                    text1: 'Error',
-                    text2: 'Failed to create payment session'
-                });
+                setGatewayHtml(
+                    buildRazorpayCheckoutHtml({
+                        keyId: rzpData.keyId,
+                        amount: rzpData.amount,
+                        currency: rzpData.currency,
+                        orderId: rzpData.orderId,
+                        mongoOrderId,
+                    })
+                );
+                setShowGateway(true);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
+            const err = error as { response?: { data?: { message?: string } }; message?: string };
             Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: error.response?.data?.message || error.message || "Failed to initialize payment"
+                text2: err.response?.data?.message || err.message || "Failed to initialize payment"
             });
         } finally {
             setLoading(false);
         }
     };
 
-    const onNavigationStateChange = (webViewState: any) => {
-        const { url } = webViewState;
-        if (url && url.includes("success.com")) {
-            setShowGateway(false);
-            clearCart();
-            router.replace("/orders");
-        } else if (url && url.includes("cancel.com")) {
-            setShowGateway(false);
-            Toast.show({
-                type: 'error',
-                text1: 'Payment Cancelled',
-                text2: 'You cancelled the payment'
-            });
+    const onGatewayMessage = async (event: { nativeEvent: { data: string } }) => {
+        try {
+            const data = JSON.parse(event.nativeEvent.data) as
+                | { type: 'razorpay_success'; mongoOrderId: string; razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }
+                | { type: 'razorpay_dismiss' };
+
+            if (data.type === "razorpay_dismiss") {
+                setShowGateway(false);
+                return;
+            }
+            if (data.type !== "razorpay_success") return;
+
+            setLoading(true);
+            try {
+                await verifyWithServer({
+                    mongoOrderId: data.mongoOrderId,
+                    razorpay_payment_id: data.razorpay_payment_id,
+                    razorpay_order_id: data.razorpay_order_id,
+                    razorpay_signature: data.razorpay_signature,
+                });
+                setShowGateway(false);
+                Toast.show({
+                    type: 'success',
+                    text1: 'Paid',
+                    text2: 'Payment successful'
+                });
+            } catch (e: unknown) {
+                console.error(e);
+                Toast.show({
+                    type: 'error',
+                    text1: 'Verification failed',
+                    text2: 'Contact support if money was debited'
+                });
+            } finally {
+                setLoading(false);
+            }
+        } catch {
+            // ignore parse errors
         }
     };
 
@@ -155,12 +309,11 @@ export default function Checkout() {
             return;
         }
 
-        if (paymentMethod === "stripe") {
-            handleStripeCheckout();
+        if (paymentMethod === "razorpay") {
+            handleRazorpayCheckout();
             return;
         }
 
-        // Cash on Delivery specific flow
         setLoading(true);
         try {
             const shippingAddressPayload = {
@@ -194,12 +347,13 @@ export default function Checkout() {
                 });
                 router.replace("/orders");
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.log(error)
+            const err = error as { response?: { data?: { message?: string } } };
             Toast.show({
                 type: 'error',
                 text1: 'Failed to Place Order',
-                text2: error.response?.data?.message || "Something went wrong"
+                text2: err.response?.data?.message || "Something went wrong"
             });
         } finally {
             setLoading(false);
@@ -223,7 +377,6 @@ export default function Checkout() {
             <Header title="Checkout" showBack />
 
             <ScrollView className="flex-1 px-4 mt-4">
-                {/* Address Section */}
                 <Text className="text-lg font-bold text-primary mb-4">Shipping Address</Text>
                 {selectedAddress ? (
                     <View className="bg-white p-4 rounded-xl mb-6 shadow-sm">
@@ -248,10 +401,8 @@ export default function Checkout() {
                     </TouchableOpacity>
                 )}
 
-                {/* Payment Section */}
                 <Text className="text-lg font-bold text-primary mb-4">Payment Method</Text>
 
-                {/* Cash on Delivery Option */}
                 <TouchableOpacity
                     onPress={() => setPaymentMethod("cash")}
                     className={`bg-white p-4 rounded-xl mb-4 shadow-sm flex-row items-center border-2 ${paymentMethod === "cash" ? "border-primary" : "border-transparent"}`}
@@ -266,24 +417,22 @@ export default function Checkout() {
                     )}
                 </TouchableOpacity>
 
-                {/* Stripe Option */}
                 <TouchableOpacity
-                    onPress={() => setPaymentMethod("stripe")}
-                    className={`bg-white p-4 rounded-xl mb-6 shadow-sm flex-row items-center border-2 ${paymentMethod === "stripe" ? "border-primary" : "border-transparent"}`}
+                    onPress={() => setPaymentMethod("razorpay")}
+                    className={`bg-white p-4 rounded-xl mb-6 shadow-sm flex-row items-center border-2 ${paymentMethod === "razorpay" ? "border-primary" : "border-transparent"}`}
                 >
                     <Ionicons name="card-outline" size={24} color={COLORS.primary} className="mr-3" />
                     <View className="ml-3 flex-1">
-                        <Text className="text-base font-bold text-primary">Pay with Card</Text>
-                        <Text className="text-secondary text-xs mt-1">Credit or Debit Card</Text>
+                        <Text className="text-base font-bold text-primary">Pay online (Razorpay)</Text>
+                        <Text className="text-secondary text-xs mt-1">UPI, cards, netbanking (charged in INR)</Text>
                     </View>
-                    {paymentMethod === "stripe" && (
+                    {paymentMethod === "razorpay" && (
                         <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
                     )}
                 </TouchableOpacity>
             </ScrollView>
 
             <View className="p-4 bg-white shadow-lg border-t border-gray-100">
-                {/* Order Summary */}
                 <Text className="text-lg font-bold text-primary mb-4">Order Summary</Text>
                 <View className="flex-row justify-between mb-2">
                     <Text className="text-secondary">Subtotal</Text>
@@ -329,12 +478,16 @@ export default function Checkout() {
                             <Ionicons name="close" size={24} color="black" />
                         </TouchableOpacity>
                     </View>
-                    <WebView
-                        source={{ uri: checkoutUrl }}
-                        onNavigationStateChange={onNavigationStateChange}
-                        startInLoadingState={true}
-                        renderLoading={() => <ActivityIndicator size="large" color={COLORS.primary} className="absolute top-1/2 left-1/2" />}
-                    />
+                    {gatewayHtml ? (
+                        <WebView
+                            source={{ html: gatewayHtml }}
+                            onMessage={onGatewayMessage}
+                            originWhitelist={["*"]}
+                            javaScriptEnabled
+                            startInLoadingState
+                            renderLoading={() => <ActivityIndicator size="large" color={COLORS.primary} className="absolute top-1/2 left-1/2" />}
+                        />
+                    ) : null}
                 </SafeAreaView>
             </Modal>
         </SafeAreaView>

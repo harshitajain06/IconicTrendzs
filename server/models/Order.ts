@@ -22,7 +22,7 @@ const orderSchema = new mongoose.Schema<IOrder>(
             zipCode: { type: String, required: true },
             country: { type: String, required: true },
         },
-        paymentMethod: { type: String, required: true, enum: ["cash", "stripe"], default: "cash" },
+        paymentMethod: { type: String, required: true, enum: ["cash", "razorpay"], default: "cash" },
         paymentStatus: { type: String, enum: ["pending", "paid", "failed", "refunded"], default: "pending" },
         paymentIntentId: { type: String },
         orderStatus: { type: String, enum: ["placed", "processing", "shipped", "delivered", "cancelled"], default: "placed" },

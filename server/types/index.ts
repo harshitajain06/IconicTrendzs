@@ -47,7 +47,7 @@ export interface IOrder extends Document {
         zipCode: string;
         country: string;
     };
-    paymentMethod: "cash" | "stripe";
+    paymentMethod: "cash" | "razorpay";
     paymentStatus: "pending" | "paid" | "failed" | "refunded";
     paymentIntentId?: string;
     orderStatus: "placed" | "processing" | "shipped" | "delivered" | "cancelled";

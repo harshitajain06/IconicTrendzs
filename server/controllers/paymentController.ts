@@ -1,129 +1,203 @@
-import Stripe from "stripe";
+import crypto from "crypto";
+import Razorpay from "razorpay";
 import Order from "../models/Order.js";
 import Cart from "../models/Cart.js";
 import { Request, Response } from "express";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const getRazorpay = () => {
+    const key_id = process.env.RAZORPAY_KEY_ID;
+    const key_secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!key_id || !key_secret) {
+        throw new Error("RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set");
+    }
+    return new Razorpay({ key_id, key_secret });
+};
 
-// Create Checkout Session
-// POST /api/payment/checkout
-export const createCheckoutSession = async (req: Request, res: Response) => {
+/** Cart totals are stored in USD; Razorpay (India) expects INR in paise. */
+function usdTotalToPaise(usdAmount: number): number {
+    const rate = Number(process.env.USD_TO_INR_RATE || "83");
+    const inr = usdAmount * rate;
+    return Math.round(inr * 100);
+}
+
+/**
+ * POST /api/payments/razorpay-order
+ * Creates a Razorpay Order for an existing MongoDB order (paymentMethod razorpay, pending).
+ */
+export const createRazorpayOrder = async (req: Request, res: Response) => {
     try {
-        const { items, shipping, success_url, cancel_url, orderId } = req.body;
-
-        const lineItems = items.map((item: any) => ({
-            price_data: {
-                currency: "usd",
-                product_data: {
-                    name: item.product.name,
-                    images: item.product.images ? [item.product.images[0]] : [],
-                },
-                unit_amount: Math.round(item.price * 100),
-            },
-            quantity: item.quantity,
-        }));
-
-        if (shipping > 0) {
-            lineItems.push({
-                price_data: {
-                    currency: "usd",
-                    product_data: {
-                        name: "Shipping",
-                    },
-                    unit_amount: Math.round(shipping * 100),
-                },
-                quantity: 1,
-            });
+        const { orderId } = req.body as { orderId?: string };
+        if (!orderId) {
+            return res.status(400).json({ success: false, message: "orderId is required" });
         }
 
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ["card"],
-            line_items: lineItems,
-            mode: "payment",
-            success_url: success_url || "https://success.com",
-            cancel_url: cancel_url || "https://cancel.com",
-            payment_intent_data: {
-                metadata: {
-                    orderId: orderId,
-                    appId: "forever-app",
-                },
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found" });
+        }
+        if (order.user.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: "Not authorized" });
+        }
+        if (order.paymentMethod !== "razorpay") {
+            return res.status(400).json({ success: false, message: "Invalid payment method for this order" });
+        }
+        if (order.paymentStatus === "paid") {
+            return res.status(400).json({ success: false, message: "Order already paid" });
+        }
+
+        const amountPaise = usdTotalToPaise(order.totalAmount);
+        if (amountPaise < 100) {
+            return res.status(400).json({ success: false, message: "Amount must be at least ₹1 (100 paise)" });
+        }
+
+        const razorpay = getRazorpay();
+        const rzpOrder = await razorpay.orders.create({
+            amount: amountPaise,
+            currency: "INR",
+            receipt: order.orderNumber.slice(0, 40),
+            notes: {
+                mongoOrderId: order._id.toString(),
+                appId: "iconic-trendzs",
             },
         });
 
-        res.json({ id: session.id, url: session.url });
+        order.paymentIntentId = rzpOrder.id;
+        await order.save();
+
+        res.json({
+            success: true,
+            keyId: process.env.RAZORPAY_KEY_ID,
+            orderId: rzpOrder.id,
+            amount: rzpOrder.amount,
+            currency: rzpOrder.currency,
+        });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        console.error("createRazorpayOrder:", error);
+        res.status(500).json({ success: false, message: error.message || "Failed to create Razorpay order" });
     }
 };
 
-// Handle Stripe Webhook
-// POST /api/stripe
-export const handleStripeWebhook = async (req: Request, res: Response) => {
-    const sig = req.headers["stripe-signature"];
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    let event;
-
+/**
+ * POST /api/payments/verify
+ * Verifies signature and marks order paid (primary path after client-side checkout).
+ */
+export const verifyRazorpayPayment = async (req: Request, res: Response) => {
     try {
-        event = stripe.webhooks.constructEvent(req.body, sig as string, endpointSecret as string);
-    } catch (err: any) {
-        console.error(`Webhook Error: ${err.message}`);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
+        const {
+            mongoOrderId,
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature,
+        } = req.body as {
+            mongoOrderId?: string;
+            razorpay_order_id?: string;
+            razorpay_payment_id?: string;
+            razorpay_signature?: string;
+        };
 
-    const { orderId, appId } = (event.data.object as any).metadata;
-
-    if (appId !== "forever-app") {
-        return res.status(400).send("Invalid app id");
-    }
-
-    // Handle the event
-    try {
-        switch (event.type) {
-            case "payment_intent.succeeded":
-                let order;
-
-                if (orderId) {
-                    order = await Order.findById(orderId);
-                } else {
-                    order = await Order.findOne({ paymentIntentId: event.data.object.id });
-                }
-
-                if (order) {
-                    order.paymentStatus = "paid";
-                    order.paymentMethod = "stripe";
-                    if (!order.paymentIntentId) {
-                        order.paymentIntentId = event.data.object.id;
-                    }
-                    await order.save();
-
-                    // Clear User Cart
-                    const cart = await Cart.findOne({ user: order.user });
-                    if (cart) {
-                        cart.items = [];
-                        cart.totalAmount = 0;
-                        await cart.save();
-                    }
-                } else {
-                    console.warn(`Order not found for PaymentIntent ${event.data.object.id}`);
-                }
-                break;
-
-            case "payment_intent.canceled":
-                await Order.findByIdAndUpdate(orderId, { paymentStatus: "failed", orderStatus: "cancelled" });
-                break;
-
-            case "payment_intent.payment_failed":
-                await Order.findByIdAndUpdate(orderId, { paymentStatus: "failed", orderStatus: "cancelled" });
-                break;
-
-            default:
-                console.log(`Unhandled event type ${event.type}`);
+        if (!mongoOrderId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+            return res.status(400).json({ success: false, message: "Missing payment fields" });
         }
 
-        res.send({ success: true });
-    } catch (err: any) {
-        console.error(`Webhook Processing Error: ${err.message}`);
-        res.status(500).send(`Webhook Processing Error: ${err.message}`);
+        const secret = process.env.RAZORPAY_KEY_SECRET;
+        if (!secret) {
+            return res.status(500).json({ success: false, message: "Server payment config error" });
+        }
+
+        const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+        const expected = crypto.createHmac("sha256", secret).update(body).digest("hex");
+        if (expected !== razorpay_signature) {
+            return res.status(400).json({ success: false, message: "Invalid payment signature" });
+        }
+
+        const order = await Order.findById(mongoOrderId);
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found" });
+        }
+        if (order.user.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: "Not authorized" });
+        }
+        if (order.paymentIntentId && order.paymentIntentId !== razorpay_order_id) {
+            return res.status(400).json({ success: false, message: "Order id mismatch" });
+        }
+
+        order.paymentStatus = "paid";
+        order.paymentMethod = "razorpay";
+        order.paymentIntentId = razorpay_order_id;
+        await order.save();
+
+        const cart = await Cart.findOne({ user: order.user });
+        if (cart) {
+            cart.items = [];
+            cart.totalAmount = 0;
+            await cart.save();
+        }
+
+        res.json({ success: true, message: "Payment verified" });
+    } catch (error: any) {
+        console.error("verifyRazorpayPayment:", error);
+        res.status(500).json({ success: false, message: error.message || "Verification failed" });
     }
+};
+
+/**
+ * POST /api/payments/webhook
+ * Backup path when client verification is unreliable; verify HMAC of raw body.
+ */
+export const handleRazorpayWebhook = async (req: Request, res: Response) => {
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+        console.warn("RAZORPAY_WEBHOOK_SECRET not set; webhook ignored");
+        return res.status(503).send("Webhook not configured");
+    }
+
+    const signature = req.headers["x-razorpay-signature"] as string | undefined;
+    const rawBody = req.body instanceof Buffer ? req.body.toString("utf8") : String(req.body);
+
+    if (!signature) {
+        return res.status(400).send("Missing signature");
+    }
+
+    const expected = crypto.createHmac("sha256", webhookSecret).update(rawBody).digest("hex");
+    if (expected !== signature) {
+        return res.status(400).send("Invalid signature");
+    }
+
+    let payload: { event?: string; payload?: { payment?: { entity?: { order_id?: string; id?: string } } } };
+    try {
+        payload = JSON.parse(rawBody);
+    } catch {
+        return res.status(400).send("Invalid JSON");
+    }
+
+    if (payload.event !== "payment.captured") {
+        return res.json({ ok: true });
+    }
+
+    const entity = payload.payload?.payment?.entity;
+    const razorpayOrderId = entity?.order_id;
+    if (!razorpayOrderId) {
+        return res.json({ ok: true });
+    }
+
+    try {
+        const order = await Order.findOne({ paymentIntentId: razorpayOrderId });
+        if (order && order.paymentStatus !== "paid") {
+            order.paymentStatus = "paid";
+            order.paymentMethod = "razorpay";
+            await order.save();
+
+            const cart = await Cart.findOne({ user: order.user });
+            if (cart) {
+                cart.items = [];
+                cart.totalAmount = 0;
+                await cart.save();
+            }
+        }
+    } catch (e: any) {
+        console.error("handleRazorpayWebhook:", e);
+        return res.status(500).send("Processing error");
+    }
+
+    res.json({ ok: true });
 };

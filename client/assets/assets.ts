@@ -1132,7 +1132,7 @@ export const dummyOrders = [
                 _id: "69895582ef9d0c746ef8284b",
             },
         ],
-        paymentMethod: "stripe",
+        paymentMethod: "razorpay",
         paymentStatus: "paid",
         orderStatus: "placed",
         subtotal: 88,

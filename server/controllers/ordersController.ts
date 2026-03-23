@@ -87,7 +87,7 @@ export const createOrder = async (req: Request, res: Response) => {
             items: orderItems,
             shippingAddress,
             paymentMethod: req.body.paymentMethod || "cash",
-            paymentStatus: req.body.paymentMethod === "stripe" ? "pending" : "pending",
+            paymentStatus: req.body.paymentMethod === "razorpay" ? "pending" : "pending",
             subtotal,
             shippingCost,
             tax,
@@ -97,7 +97,7 @@ export const createOrder = async (req: Request, res: Response) => {
             orderNumber: "ORD-" + Date.now(),
         });
 
-        if (req.body.paymentMethod !== "stripe") {
+        if (req.body.paymentMethod !== "razorpay") {
             cart.items = [];
             cart.totalAmount = 0;
             await cart.save();
