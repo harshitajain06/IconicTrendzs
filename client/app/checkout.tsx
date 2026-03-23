@@ -454,7 +454,7 @@ export default function Checkout() {
                 <TouchableOpacity
                     onPress={handlePlaceOrder}
                     disabled={loading}
-                    className={`p-4 rounded-xl items-center ${loading ? 'bg-gray-400' : 'bg-primary'}`}
+                    className={`p-3 rounded-xl bottom-7 items-center ${loading ? 'bg-gray-400' : 'bg-primary'}`}
                 >
                     {loading ? (
                         <ActivityIndicator color="white" />

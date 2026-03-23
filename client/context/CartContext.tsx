@@ -43,16 +43,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
             const { data } = await api.get('/cart', { headers: { Authorization: `Bearer ${token}` } });
             if (data.success && data.data) {
                 const serverCart = data.data;
-                const mappedItems: CartItem[] = serverCart.items.map((item: any) => ({
-                    id: item.product._id,
-                    productId: item.product._id,
-                    product: item.product,
-                    quantity: item.quantity,
-                    size: item?.size || "M",
-                    price: item.price
-                }));
+                const mappedItems: CartItem[] = serverCart.items.reduce((acc: CartItem[], item: any) => {
+                    // If the referenced product was deleted, mongoose populate returns `product: null`.
+                    // Skip those items so the client never crashes rendering the cart.
+                    const product = item?.product;
+                    if (!product?._id) return acc;
+
+                    acc.push({
+                        id: String(product._id),
+                        productId: String(product._id),
+                        product,
+                        quantity: item.quantity,
+                        size: item?.size || "M",
+                        price: item.price
+                    });
+                    return acc;
+                }, []);
                 setCartItems(mappedItems);
-                setCartTotal(serverCart.totalAmount);
+                // Recompute on the client to stay consistent with any filtered items above.
+                setCartTotal(mappedItems.reduce((sum, item) => sum + item.price * item.quantity, 0));
             }
         } catch (error) {
             console.error("Failed to fetch cart:", error);

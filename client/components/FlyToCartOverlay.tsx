@@ -33,7 +33,8 @@ export const FlyToCartOverlay = forwardRef<FlyToCartHandle>(function FlyToCartOv
     const animatedStyle = useAnimatedStyle(() => ({
         position: "absolute",
         left: sx.value + dx.value * progress.value,
-        top: sy.value + dy.value * progress.value + Math.sin(progress.value * Math.PI) * -52,
+        // Keep the animation path from arcing too far upward (prevents overlap with top UI).
+        top: sy.value + dy.value * progress.value,
         width: DOT,
         height: DOT,
         borderRadius: DOT / 2,

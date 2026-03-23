@@ -186,7 +186,7 @@ export default function ProductDetails() {
             </ScrollView>
 
             {/* Footer */}
-            <View className="absolute bottom-0 left-0 flex-row right-0 p-4 bg-white border-t border-gray-100">
+            <View className="absolute bottom-6 left-0 flex-row right-0 p-4 bg-white border-t border-gray-100">
                 <View ref={addButtonRef} collapsable={false} className="w-4/5">
                     <TouchableOpacity
                         onPress={handleAddToCart}
@@ -196,13 +196,16 @@ export default function ProductDetails() {
                         <Text className="text-white font-bold text-base ml-2">Add to Cart</Text>
                     </TouchableOpacity>
                 </View>
-                <View ref={cartIconRef} collapsable={false} className="w-1/5 py-3 flex-row justify-center relative">
+                <View collapsable={false} className="w-1/5 py-3 flex-row justify-center relative">
                     <TouchableOpacity
                         onPress={() => router.push("/(tabs)/cart")}
-                        className="flex-1 items-center justify-center"
+                        className="flex-1 items-center justify-center relative"
                     >
-                        <Ionicons name="cart-outline" size={24} />
-                        <View className="absolute top-2 right-4 size-4 z-10 bg-black rounded-full justify-center items-center">
+                        {/* Measure only the icon (not the badge container) for cleaner animation target */}
+                        <View ref={cartIconRef} collapsable={false} className="items-center justify-center w-10 h-10">
+                            <Ionicons name="cart-outline" size={24} />
+                        </View>
+                        <View className="absolute top-2 right-0 size-4 z-10 bg-black rounded-full justify-center items-center">
                             <Text className="text-white text-[9px]">{cartItems.reduce((acc, item) => acc + item.quantity, 0)}</Text>
                         </View>
                     </TouchableOpacity>

@@ -948,10 +948,56 @@ const PRODUCTS = [
 export const seedProducts = async (uri: string) => {
     try {
         await mongoose.connect(uri);
-        const products = await Product.find();
-        if (products.length === 0) {
-            await Product.insertMany(PRODUCTS);
-        }
+
+        // Upsert each seeded product so the collection stays in sync
+        // even if it already contains partial/older seed data.
+        // Use `any` for the seed payload since this file's PRODUCTS constant
+        // doesn't have strict typing like the Product model.
+        const bulkOps: any[] = PRODUCTS.map((product) => {
+            const {
+                _id,
+                name,
+                description,
+                price,
+                images,
+                sizes,
+                category,
+                stock,
+                isFeatured,
+                isActive,
+                ratings,
+            } = product as any;
+
+            const comparePrice = (product as any).comparePrice as number | undefined;
+
+            return {
+                updateOne: {
+                    filter: { _id },
+                    update: {
+                        $set: {
+                            _id,
+                            name,
+                            description,
+                            price,
+                            ...(comparePrice !== undefined ? { comparePrice } : {}),
+                            images,
+                            sizes,
+                            category,
+                            stock,
+                            isFeatured,
+                            isActive,
+                            ratings,
+                        },
+                    },
+                    upsert: true,
+                },
+            };
+        });
+
+        const result = await Product.bulkWrite(bulkOps, { ordered: false });
+        console.log(
+            `SeedProducts: matched=${result.matchedCount ?? 0}, upserted=${result.upsertedCount ?? 0}`
+        );
     } catch (error) {
         console.error("Seeding Error:", error);
     }

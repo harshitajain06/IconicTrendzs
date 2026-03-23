@@ -12,6 +12,15 @@ export const getCart = async (req: Request, res: Response) => {
             cart = await Cart.create({ user: req.user._id, items: [] });
         }
 
+        // If a product referenced by a cart item no longer exists, populate will set `item.product` to null.
+        // Filter those out so the client can safely render cart items.
+        const hasInvalidItems = (cart.items as any[]).some((item) => !item?.product);
+        if (hasInvalidItems) {
+            cart.items = (cart.items as any[]).filter((item) => !!item?.product) as any;
+            cart.calculateTotal();
+            await cart.save();
+        }
+
         res.json({ success: true, data: cart });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message });
