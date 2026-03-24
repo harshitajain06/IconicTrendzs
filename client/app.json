@@ -19,11 +19,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.iconictrendzs.client"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png", 
+      "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -44,6 +45,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "499b7d7f-b64a-49fd-9b63-daf1eadaa5e4"
+      }
     }
   }
 }

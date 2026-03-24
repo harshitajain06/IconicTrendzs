@@ -8,7 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "vercel-build": "expo export --platform web --output dist"
   },
   "dependencies": {
     "@clerk/clerk-expo": "^2.19.31",
@@ -21,6 +22,7 @@
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
     "expo-crypto": "~15.0.8",
+    "expo-dev-client": "~6.0.20",
     "expo-font": "~14.0.11",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
