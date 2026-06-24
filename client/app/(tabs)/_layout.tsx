@@ -25,6 +25,7 @@ export default function TabLayout() {
                     height: 36 + insets.bottom,
                     paddingTop: 8,
                     paddingBottom: insets.bottom,
+                    marginBottom: 4,
                 },
             }}
         >

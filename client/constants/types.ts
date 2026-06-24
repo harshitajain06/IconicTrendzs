@@ -114,6 +114,16 @@ export interface Order {
     createdAt: string;
 }
 
+export interface Review {
+    _id: string;
+    user: string;
+    product: string;
+    rating: number;
+    comment: string;
+    userName: string;
+    createdAt: string;
+}
+
 export type WishlistContextType = {
     wishlist: Product[];
     toggleWishlist: (product: Product) => void;
