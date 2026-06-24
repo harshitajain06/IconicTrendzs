@@ -95,3 +95,12 @@ export interface IWishlist extends Document {
     products: Types.ObjectId[];
     createdAt: Date;
 }
+
+export interface IReview extends Document {
+    user: Types.ObjectId;
+    product: Types.ObjectId;
+    rating: number;
+    comment: string;
+    userName: string;
+    createdAt: Date;
+}

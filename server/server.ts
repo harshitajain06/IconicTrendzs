@@ -14,6 +14,7 @@ import { clerkWebhook } from "./controllers/webhooks.js";
 import { handleRazorpayWebhook } from "./controllers/paymentController.js";
 import paymentRouter from "./routes/paymentRoute.js";
 import { seedProducts } from "./scripts/seedProducts.js";
+import ReviewRouter from "./routes/reviewRoutes.js";
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.use("/api/addresses", AddressRouter);
 app.use("/api/wishlist", WishlistRouter);
 app.use("/api/admin", AdminRouter);
 app.use("/api/payments", paymentRouter);
+app.use("/api/products/:id/reviews", ReviewRouter);
 
 const PORT = process.env.PORT || 3000;
 
