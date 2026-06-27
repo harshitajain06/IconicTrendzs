@@ -30,7 +30,9 @@ export default function ProductCard({ product }: ProductCardProps) {
                 <View className="p-3">
                     <View className="flex-row items-center mb-1">
                         <Ionicons name="star" size={14} color="#FFD700" />
-                        <Text className="text-secondary text-xs ml-1">4.6</Text>
+                        <Text className="text-secondary text-xs ml-1">
+                            {product.ratings?.average > 0 ? product.ratings.average.toFixed(1) : "—"}
+                        </Text>
                     </View>
                     <Text className="text-primary font-medium text-sm mb-1" numberOfLines={1}>
                         {product.name}
