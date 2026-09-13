@@ -65,7 +65,10 @@ export default function Home() {
                                 <View className="absolute bottom-4 left-4 z-10">
                                     <Text className="text-white text-2xl font-bold">{banner.title}</Text>
                                     <Text className="text-white text-sm font-medium">{banner.subtitle}</Text>
-                                    <TouchableOpacity className="mt-2 bg-white px-4 py-2 rounded-full self-start">
+                                    <TouchableOpacity
+                                        className="mt-2 bg-white px-4 py-2 rounded-full self-start"
+                                        onPress={() => router.push({ pathname: "/shop", params: { bannerTag: banner.bannerTag } })}
+                                    >
                                         <Text className="text-primary font-bold text-xs">Get Now</Text>
                                     </TouchableOpacity>
                                 </View>

@@ -4,18 +4,21 @@ export const BANNERS = [
         image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1000&auto=format&fit=crop",
         title: "All styles under ₹499",
         subtitle: "Upgrade your wardrobe — limited quantities",
+        bannerTag: "under499",
     },
     {
         id: 2,
         image: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?q=80&w=1000&auto=format&fit=crop",
         title: "New Arrivals",
         subtitle: "Summer Collection 2024",
+        bannerTag: "new_arrivals",
     },
     {
         id: 3,
         image: "https://images.unsplash.com/photo-1445205170230-053b83016050?q=80&w=1000&auto=format&fit=crop",
         title: "Big Sale",
         subtitle: "Up to 70% off shoes",
+        bannerTag: "big_sale",
     },
 ];
 

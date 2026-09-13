@@ -23,8 +23,15 @@ export default function Shop() {
 
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
+    const [bannerTag] = useState(params.bannerTag as string || "");
 
     const [showFilters, setShowFilters] = useState(false);
+
+    const BANNER_LABELS: Record<string, string> = {
+        under499: "All Styles Under ₹499",
+        new_arrivals: "New Arrivals",
+        big_sale: "Big Sale",
+    };
 
     const fetchProducts = async (pageNumber = 1) => {
         if (pageNumber === 1) {
@@ -39,6 +46,7 @@ export default function Shop() {
             if (minPrice) queryParams.minPrice = minPrice;
             if (maxPrice) queryParams.maxPrice = maxPrice;
             if (search) queryParams.search = search;
+            if (bannerTag) queryParams.bannerTag = bannerTag;
 
             const { data } = await api.get("/products", { params: queryParams });
 
@@ -86,6 +94,15 @@ export default function Shop() {
     return (
         <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
             <Header title="Shop" showBack showCart />
+
+            {bannerTag ? (
+                <View className="mx-4 mt-2 mb-1 flex-row items-center gap-2">
+                    <View className="bg-primary px-3 py-1 rounded-full flex-row items-center gap-1.5">
+                        <Ionicons name="pricetag-outline" size={13} color="#fff" />
+                        <Text className="text-white text-xs font-semibold">{BANNER_LABELS[bannerTag] ?? bannerTag}</Text>
+                    </View>
+                </View>
+            ) : null}
 
             <View className="flex-row gap-2 mb-3 mx-4 my-2">
                 <View className="flex-1 flex-row items-center bg-white  rounded-xl border border-gray-100">

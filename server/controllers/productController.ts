@@ -6,13 +6,17 @@ import { Request, Response } from "express";
 // GET /api/products
 export const getProducts = async (req: Request, res: Response) => {
     try {
-        const { page = 1, limit = 10, category, minPrice, maxPrice, search, sort = "-createdAt" } = req.query;
+        const { page = 1, limit = 10, category, minPrice, maxPrice, search, sort = "-createdAt", bannerTag } = req.query;
 
         const query: any = { isActive: true };
         const priceQuery: Record<string, number> = {};
 
         if (category && typeof category === "string") {
             query.category = category;
+        }
+
+        if (bannerTag && typeof bannerTag === "string") {
+            query.bannerTag = bannerTag;
         }
 
         if (minPrice && !Number.isNaN(Number(minPrice))) {

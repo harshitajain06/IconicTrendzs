@@ -13,6 +13,7 @@ const productSchema = new Schema<IProduct>(
         category: { type: String, required: true, enum: ["Men", "Women", "Kids", "Shoes", "Bags", "Other"], default: "Other" },
         stock: { type: Number, required: true, default: 0, min: 0 },
         ratings: { average: { type: Number, default: 0, min: 0, max: 5 }, count: { type: Number, default: 0 } },
+        bannerTag: { type: String, enum: ["under499", "new_arrivals", "big_sale"], default: null },
         isFeatured: { type: Boolean, default: false },
         isActive: { type: Boolean, default: true },
     },

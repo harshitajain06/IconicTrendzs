@@ -25,6 +25,7 @@ export default function EditProduct() {
     const [category, setCategory] = useState("");
     const [sizes, setSizes] = useState("");
     const [isFeatured, setIsFeatured] = useState(false);
+    const [bannerTag, setBannerTag] = useState<string>("");
 
     // Image State
     const [existingImages, setExistingImages] = useState<string[]>([]);
@@ -42,6 +43,7 @@ export default function EditProduct() {
                     setStock(product.stock.toString());
                     setCategory(typeof product.category === 'object' ? product.category.name : product.category);
                     setIsFeatured(product.isFeatured);
+                    setBannerTag(product.bannerTag || "");
 
                     if (product.sizes) setSizes(Array.isArray(product.sizes) ? product.sizes.join(", ") : product.sizes);
 
@@ -115,6 +117,7 @@ export default function EditProduct() {
             formData.append("category", category);
             formData.append("isFeatured", String(isFeatured));
             formData.append("sizes", sizes);
+            if (bannerTag) formData.append("bannerTag", bannerTag);
 
             // Append existing images
             existingImages.forEach((img) => {

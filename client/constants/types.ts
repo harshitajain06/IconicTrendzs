@@ -33,6 +33,7 @@ export interface Product {
         average: number;
         count: number;
     };
+    bannerTag?: "under499" | "new_arrivals" | "big_sale" | null;
     isFeatured: boolean;
     isActive: boolean;
     createdAt: string;

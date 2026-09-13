@@ -25,6 +25,7 @@ export default function AddProduct() {
     const [sizes, setSizes] = useState("");
     const [images, setImages] = useState<string[]>([]);
     const [isFeatured, setIsFeatured] = useState(false);
+    const [bannerTag, setBannerTag] = useState<string>("");
 
     // PICK MULTIPLE IMAGES (MAX 5)
     const pickImages = async () => {
@@ -59,15 +60,16 @@ export default function AddProduct() {
             const formData = new FormData();
 
             // Basic fields
-            const fields = {
+            const fields: Record<string, string> = {
                 name,
                 description,
                 price,
                 stock: stock || "0",
                 category,
                 isFeatured: String(isFeatured),
-                sizes
+                sizes,
             };
+            if (bannerTag) fields.bannerTag = bannerTag;
 
             Object.entries(fields).forEach(([key, value]) =>
                 formData.append(key, value)
@@ -265,6 +267,25 @@ export default function AddProduct() {
                         onValueChange={setIsFeatured}
                         trackColor={{ false: "#eee", true: COLORS.primary }}
                     />
+                </View>
+
+                {/* BANNER TAG */}
+                <Text className="text-secondary text-xs font-bold mb-2 uppercase">Banner Category (Optional)</Text>
+                <View className="flex-row flex-wrap gap-2 mb-6">
+                    {[
+                        { label: "None", value: "" },
+                        { label: "Under ₹499", value: "under499" },
+                        { label: "New Arrivals", value: "new_arrivals" },
+                        { label: "Big Sale", value: "big_sale" },
+                    ].map((opt) => (
+                        <TouchableOpacity
+                            key={opt.value}
+                            onPress={() => setBannerTag(opt.value)}
+                            className={`px-4 py-2 rounded-full border ${bannerTag === opt.value ? "bg-primary border-primary" : "bg-white border-gray-200"}`}
+                        >
+                            <Text className={bannerTag === opt.value ? "text-white font-semibold" : "text-primary"}>{opt.label}</Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
 
                 {/* SUBMIT */}
