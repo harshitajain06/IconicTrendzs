@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Dimensions, Image, ScrollView, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CategoryItem from "@/components/CategoryItem";
@@ -11,17 +11,37 @@ import { CATEGORIES } from "@/constants";
 import { BANNERS } from "@/assets/assets";
 
 const { width } = Dimensions.get("window");
+const BANNER_WIDTH = width - 32;
+const AUTO_SCROLL_INTERVAL = 3500;
 
 export default function Home() {
     const router = useRouter();
     const [activeBannerIndex, setActiveBannerIndex] = useState(0);
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
+    const bannerScrollRef = useRef<ScrollView>(null);
+    const activeBannerIndexRef = useRef(0);
 
     const categories = [{ id: "all", name: "All", icon: "grid" }, ...CATEGORIES];
 
     useEffect(() => {
         fetchProducts();
+    }, []);
+
+    useEffect(() => {
+        activeBannerIndexRef.current = activeBannerIndex;
+    }, [activeBannerIndex]);
+
+    useEffect(() => {
+        if (BANNERS.length <= 1) return;
+
+        const timer = setInterval(() => {
+            const nextIndex = (activeBannerIndexRef.current + 1) % BANNERS.length;
+            bannerScrollRef.current?.scrollTo({ x: nextIndex * BANNER_WIDTH, animated: true });
+            setActiveBannerIndex(nextIndex);
+        }, AUTO_SCROLL_INTERVAL);
+
+        return () => clearInterval(timer);
     }, []);
 
     const fetchProducts = async () => {
@@ -43,20 +63,21 @@ export default function Home() {
                 {/* Banner Slider */}
                 <View className="mb-6">
                     <ScrollView
+                        ref={bannerScrollRef}
                         horizontal
                         pagingEnabled
                         showsHorizontalScrollIndicator={false}
                         className="w-full h-48 rounded-xl"
                         onScroll={(e) => {
-                            const slide = Math.ceil(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width);
-                            if (slide !== activeBannerIndex) {
+                            const slide = Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width);
+                            if (slide !== activeBannerIndexRef.current) {
                                 setActiveBannerIndex(slide);
                             }
                         }}
                         scrollEventThrottle={16}
                     >
                         {BANNERS.map((banner, index) => (
-                            <View key={index} className="relative w-full h-48 bg-gray-200 overflow-hidden" style={{ width: width - 32 }}>
+                            <View key={index} className="relative w-full h-48 bg-gray-200 overflow-hidden" style={{ width: BANNER_WIDTH }}>
                                 <Image
                                     source={{ uri: banner.image }}
                                     className="w-full h-full"
